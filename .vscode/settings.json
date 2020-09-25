@@ -1,0 +1,20 @@
+{
+	"go.formatTool": "gofmt",
+	"go.buildOnSave": "off",
+	"go.lintTool":"golangci-lint",
+    "go.lintFlags": [
+        "--fast",
+        "-E", "goimports",
+        "-E", "gocritic",
+        "-E", "gocyclo",
+        "-E", "gosec",
+        "-E", "maligned",
+        "-E", "scopelint",
+        "-E", "interfacer",
+        "-E", "goconst",
+        "-E", "unconvert",
+        "-E", "unparam",
+        "-E", "prealloc",
+        "-E", "varcheck",
+    ]
+}
