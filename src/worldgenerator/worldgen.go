@@ -3,6 +3,9 @@ package worldgenerator
 import (
 	common "common"
 	"fmt"
+	rl "github.com/gen2brain/raylib-go/raylib"
+	"github/raylib-go-master/easings"
+
 	goNoise "goNoise"
 	"math"
 	"time"
@@ -45,26 +48,25 @@ func GenerateWorld(
 	// Noise Creation
 	start := time.Now().UnixNano() / 1000000
 
-	mountainMask := *goNoise.GenFBM(width, height, mountainMaskParams, scale)
-	continentMask := *goNoise.GenFBM(width, height, continentMaskParams, scale)
+	mountainMask := *goNoise.GenFBMParalell(width, height, mountainMaskParams, scale)
+	continentMask := *goNoise.GenFBMParalell(width, height, continentMaskParams, scale)
 
 	heightMap := *goNoise.GetLayeredNoise(width, height, landNoiseParams, scale)
-	mountainNoise := *goNoise.GenRidgedFBM(width, height, mountainNoiseParams, scale, true)
-	tempMap := *goNoise.GenFBM(width, height, landNoiseParams[1], scale)
-	moistMap := *goNoise.GenFBM(width, height, goNoise.NoiseParams{
-		ScaleX:      30.0,
+	mountainNoise := *goNoise.GenRidgedFBMParalell(width, height, mountainNoiseParams, scale, true, 0.1)
+	tempMap := *goNoise.GenFBMParalell(width, height, landNoiseParams[1], scale)
+	moistMap := *goNoise.GenFBMParalell(width, height, goNoise.NoiseParams{
+		ScaleX:      20.0,
 		ScaleY:      15.0,
-		Octaves:     4,
+		Octaves:     5,
 		Persistance: 0.5,
-		Lacunarity:  2.0,
+		Lacunarity:  2.5,
 		Gain:        0.3,
-		Bias:        0.3,
+		Bias:        0.4,
 		Seed:        params.Seed + 7},
 		scale)
 
 	t := time.Now().UnixNano() / 1000000
 	fmt.Println("Noise Maps creation msec: ", t-start)
-	start = time.Now().UnixNano() / 1000000
 
 	// Obtain Continents with minor noise
 	highest_num := 0.0
@@ -78,117 +80,72 @@ func GenerateWorld(
 		heightMap[i] = heightMap[i] * centreDistanceFactor * continentMask[i]
 		if heightMap[i] > fWaterHeight {
 			heightMap[i] -= fWaterHeight
-			heightMap[i] *= 0.5
+			heightMap[i] *= 0.33
 			heightMap[i] += fWaterHeight
-
 		}
 		if heightMap[i] > highest_num {
 			highest_num = heightMap[i]
 		}
 
 	}
-	fmt.Println("Highest num is ", highest_num)
-
-	t = time.Now().UnixNano() / 1000000
-	fmt.Println("Height operations msec: ", t-start)
-
-	start = time.Now().UnixNano() / 1000000
 
 	// Find distance to water and land
-	maxDistR := 8
-	for idx := range heightMap {
-		x, y := getPoint(idx, width)
-		currElev := heightMap[idx]
-
-		//Water or land value for tile that is checked
-		water := true
-
-		if currElev > fWaterHeight {
-			water = false
-			world.DistanceToLand[idx] = 0
-			world.DistanceToWater[idx] = byte(maxDistR)
-		} else {
-			world.DistanceToWater[idx] = 0
-			world.DistanceToLand[idx] = byte(maxDistR)
-		}
-
-	distanceFound:
-
-		// Check within a radius of r
-		for r := 1; r < maxDistR; r++ {
-
-			for dy := -r; dy <= r; dy++ {
-				for dx := -r; dx <= r; dx++ {
-
-					if dx < r && dy < r && dx > -r && dy > -r {
-						continue
-					}
-
-					didx := getIdx((x + dx), (y + dy), width)
-					if didx < 0 || didx > len(heightMap)-1 {
-						continue
-					}
-
-					locElev := heightMap[didx]
-
-					if water {
-						// Check  found land
-						if locElev > fWaterHeight {
-							world.DistanceToLand[idx] = byte(r)
-							break distanceFound
-						}
-
-					} else {
-						//Check found water
-						if locElev < fWaterHeight {
-							world.DistanceToWater[idx] = byte(r)
-							break distanceFound
-						}
-					}
-
-				}
-			}
-		}
-	}
-
-	for i := range heightMap {
-		distToWater := easeOutQuad(float64(world.DistanceToWater[i]) / float64(maxDistR+2))
-		heightMap[i] += (mountainNoise[i] * mountainMask[i] * distToWater) * 0.4
-		//mountainNoise[i] = mountainMask[i]
-	}
-
+	start = time.Now().UnixNano() / 1000000
+	maxDistR := 5
+	findShoreDistances(heightMap, &world, maxDistR)
 	t = time.Now().UnixNano() / 1000000
 	fmt.Println("Distance calc msec: ", t-start)
-	start = time.Now().UnixNano() / 1000000
+
+	// Add Mountains
+	for i := range heightMap {
+		distToWater := easeOutQuad(float64(world.DistanceToWater[i]) / float64(maxDistR+2))
+		heightMap[i] += (mountainNoise[i] * mountainMask[i] * distToWater) * (1.0 - highest_num)
+	}
+
+	generateRivers(&world, params, &heightMap)
 
 	//Temperature
 	for i := 0; i < len(tempMap); i++ {
-		distToCentre := math.Pow(math.Abs(float64(midheight-(i/width)))/float64(midheight), 2)
-		centreDistanceFactor := goNoise.GetBias(1.0-distToCentre, 0.5)
-		if centreDistanceFactor > 1.0 {
-			centreDistanceFactor = 1.0
+		distToCentre := math.Pow(math.Abs(float64(midheight-(i/width)))/float64(midheight), 1.5)
+
+		//centreDistanceFactor := float64(easings.CubicInOut(float32(1.0-distToCentre), 0.0, 0.65, 1.0))
+		//centreDistanceFactor := cubicInterpolate(0.6, 0.0, 1.0, 2.1, 1.0-distToCentre)
+		centreDistanceFactor := goNoise.GetBias(1.0-distToCentre, 0.1)
+
+		height := heightMap[i]
+
+		if height < fWaterHeight {
+			tempMap[i] = goNoise.GetBias((centreDistanceFactor+height)*0.5, 0.97) * 1.0
+			continue
 		}
 
 		distToWater := easeOutQuad(float64(world.DistanceToWater[i]) / float64(maxDistR))
-		height := heightMap[i]
-		if height < fWaterHeight {
-			tempMap[i] = goNoise.GetBias((centreDistanceFactor+height)*0.5, 0.8) * 0.8
-		} else {
-			noiseFactor := 0.2
-			distWFactor := 0.3
-			hFactor := 0.8
+		//height = clampF64(float64(easings.CubicInOut(float32(
+		//	1.0-(height-fWaterHeight)*(1.0/fWaterHeight)),
+		//	0.0,
+		//	1.0,
+		//	1.0)), 0.0, 1.0)
+		height = 1.0 - (height-fWaterHeight)*(1.0/fWaterHeight)
 
-			temp := (centreDistanceFactor)
+		centreDistanceFactor = goNoise.GetGain(centreDistanceFactor, 0.35)
+		noiseFactor := 0.2
+		distWFactor := 0.2
+		hFactor := 0.8
 
-			temp = temp + ((1.0 - ((height) - fWaterHeight)) * hFactor) + (distToWater * distWFactor) + (tempMap[i] * noiseFactor)
+		//temp := centreDistanceFactor +
+		//	(distToWater * distWFactor) +
+		//	(tempMap[i] * noiseFactor)
 
-			tempMap[i] = (temp / (1.0 + hFactor + distWFactor + noiseFactor))
+		//tempMap[i] = (temp / (1.0 + distWFactor + noiseFactor)) * height
 
-		}
+		temp := centreDistanceFactor +
+			(height * hFactor) +
+			(distToWater * distWFactor) +
+			(tempMap[i] * noiseFactor)
+
+		tempMap[i] = (temp / (1.0 + hFactor + distWFactor + noiseFactor))
 
 	}
-	t = time.Now().UnixNano() / 1000000
-	fmt.Println("temp calc msec: ", t-start)
 
 	// Moisture
 	for i := 0; i < len(moistMap); i++ {
@@ -197,14 +154,20 @@ func GenerateWorld(
 		} else {
 			noise := moistMap[i]
 			temp := 1.0 - tempMap[i]
-			height := 1.0 - heightMap[i]
+			height := heightMap[i]
+			height = clampF64(float64(easings.CubicOut(float32(
+				1.0-(height-fWaterHeight)*(1.0/fWaterHeight)),
+				0.0,
+				0.2,
+				1.0)), 0.0, 1.0)
 			waterdist := easeOutQuad(float64(world.DistanceToWater[i]) / float64(maxDistR))
 
 			distToWaterFactor := 0.25
-			noisefactor := 0.3
-			tempFactor := 3.0
-			heightFactor := 0.4
+			noisefactor := 3.0
+			tempFactor := 0.2
+			heightFactor := 0.3
 			moistMap[i] = ((waterdist * distToWaterFactor) + (noise * noisefactor) + (temp * tempFactor) + (height * heightFactor)) / (distToWaterFactor + noisefactor + tempFactor + heightFactor)
+			moistMap[i] *= temp
 		}
 	}
 
@@ -231,7 +194,7 @@ func GenerateWorld(
 		biome := SHRUBLAND
 
 		if height < world.WaterLine {
-			if cTemp < 1.0 {
+			if cTemp < -10.0 {
 				biome = OCEANIC_GLACIER
 			} else if height < (waterHeight - 35) {
 				biome = OPEN_SEA
@@ -239,13 +202,13 @@ func GenerateWorld(
 				biome = SHALLOW_SEA
 			}
 		} else if height > world.MountainLine+20 {
-			if moist < 90 {
+			if moist < 180 {
 				biome = MOUNTAIN
 			} else {
 				biome = GLACIER
 			}
 		} else if height > world.MountainLine {
-			if moist < 125 {
+			if moist < 180 {
 				biome = BARE
 			} else {
 				biome = GLACIER
@@ -283,7 +246,9 @@ func GenerateWorld(
 				// temperate zone
 				if precipitation < 50.0 {
 					biome = TEMPERATE_DESERT
-				} else if precipitation < 75.0 {
+				} else if precipitation < 70.0 {
+					biome = SAVANNA
+				} else if precipitation < 120.0 {
 					biome = SHRUBLAND
 				} else if precipitation < 200.0 {
 					biome = TEMPERATE_DECIDUOUS_FOREST
@@ -313,4 +278,49 @@ func GenerateWorld(
 
 	return &world
 
+}
+
+func generateRivers(world *World, parameters WorldParams, pheightMap *[]float64) {
+
+	width := parameters.Width
+	height := parameters.Height
+	heightMap := *pheightMap
+
+	//riverFlowGen
+	world.FlowDirection = make([]rl.Vector2, width*height)
+	world.FlowFactor = make([]float32, width*height)
+
+	for y := 1; y < height-1; y++ {
+		for x := 1; x < width-1; x++ {
+
+			idx := getIdx(x, y, width)
+			currHeight := heightMap[idx]
+			//lowIdx := idx
+			lowHeight := currHeight
+			dir := rl.Vector2{0, 0}
+
+			//Find lowestPoint adjacent
+			for dy := -1; dy < 2; dy++ {
+				for dx := -1; dx < 2; dx++ {
+					if dx != 0 && dy != 0 {
+
+						if x+dx < 0 || x+dx >= width || y+dy < 0 || y+dy >= height {
+							continue
+						}
+						_idx := getIdx(x+dx, y+dy, width)
+						checkHeight := heightMap[_idx]
+						if checkHeight < lowHeight {
+							//lowIdx = _idx
+							lowHeight = checkHeight
+							dir.X = float32(dx)
+							dir.Y = float32(dy)
+						}
+					}
+				}
+			}
+			world.FlowDirection[idx] = dir
+			world.FlowFactor[idx] = float32(currHeight - lowHeight)
+
+		}
+	}
 }

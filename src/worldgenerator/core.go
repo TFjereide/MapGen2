@@ -7,6 +7,28 @@ import (
 // Define terraintypes in the form of biomes
 type BiomeType uint8
 
+const (
+	N byte = iota
+	NE
+	E
+	SE
+	S
+	SW
+	W
+	NW
+)
+
+var DIRECTION_VECTORS = map[rl.Vector2]byte{
+	rl.Vector2{0, -1}:  N,
+	rl.Vector2{1, -1}:  NE,
+	rl.Vector2{1, 0}:   E,
+	rl.Vector2{1, 1}:   SE,
+	rl.Vector2{0, 1}:   S,
+	rl.Vector2{-1, 1}:  SW,
+	rl.Vector2{-1, 0}:  W,
+	rl.Vector2{-1, -1}: NW,
+}
+
 //TODO: add glacial type
 const (
 	OPEN_SEA BiomeType = iota
@@ -61,7 +83,7 @@ var BIOME_BG_COLORS = [...]rl.Color{
 	rl.NewColor(139, 129, 118, 255), // bare
 	rl.NewColor(50, 82, 64, 255),    //Tundra
 	rl.NewColor(189, 162, 132, 255), //temp desert
-	rl.NewColor(189, 162, 132, 255), //subtropical desert
+	rl.NewColor(220, 180, 132, 255), //subtropical desert
 	rl.NewColor(16, 74, 41, 255),    // taiga
 	rl.NewColor(30, 60, 34, 255),    // temp rainf
 	rl.NewColor(28, 64, 5, 255),     // trop rainf
@@ -78,12 +100,12 @@ var BIOME_FG_COLORS = [...]rl.Color{
 	rl.NewColor(46, 62, 165, 255),   // freshwater
 	rl.NewColor(233, 235, 255, 255), // Oceanic Glacier
 	rl.NewColor(233, 235, 255, 255), // Glacier
-	rl.NewColor(156, 155, 134, 255), // Mountain
-	rl.NewColor(115, 129, 118, 255), // bare
+	rl.NewColor(150, 150, 150, 255), // Mountain
+	rl.NewColor(60, 39, 20, 255),    // bare
 	rl.NewColor(50, 82, 64, 255),    //Tundra
 	rl.NewColor(189, 162, 132, 255), //temp desert
-	rl.NewColor(189, 162, 132, 255), // subtropical desert
-	rl.NewColor(20, 60, 50, 255),    // taiga
+	rl.NewColor(220, 180, 132, 255), // subtropical desert
+	rl.NewColor(20, 40, 50, 255),    // taiga
 	rl.NewColor(15, 40, 30, 255),    // temp rainf
 	rl.NewColor(17, 32, 7, 255),     // trop rainf
 	rl.NewColor(47, 67, 22, 255),    // trop  seasonal f
@@ -99,11 +121,11 @@ var BIOME_SYMBOLS = [...]string{
 	`≈≈`,              // freshwater
 	`░░`,              // Oceanic Glacier
 	`░░`,              // Glacier
-	`▲∩∩`,             // Mountain
-	`∩`,               // bare
+	`▲▲^`,             // Mountain
+	`▲^^^`,            // bare
 	`░░░▒▓""`,         // Tundra
-	`░≈`,              // temp desert
-	`░≈`,              // subtropical desert
+	`░░░▒▓,.,.`,       // temp desert
+	`░░░▒▓.,.`,        // subtropical desert
 	`♣¶♠♠♠♠♠t↑îƒ§¥↕⌠`, // taiga
 	`♣¶♠t↑îƒ§¥↕⌠`,     // temp rainf
 	`♣¶♠t↑îƒ§¥⌠`,      // trop rainf
@@ -115,8 +137,8 @@ var BIOME_SYMBOLS = [...]string{
 	`≈░░¾≈`} // wetland
 
 // TODO: implement temp scaling to real world celsius
-const MAX_TEMP_C = 38
-const MIN_TEMP_c = 18 // in minus
+const MAX_TEMP_C = 40
+const MIN_TEMP_c = 40 // in minus
 
 //TODO: Moisture as humidity in real world scales?
 const MAX_PRECIPITATION = 450
@@ -135,6 +157,8 @@ type World struct {
 	BiomeMap        []BiomeType
 	DistanceToLand  []byte
 	DistanceToWater []byte
+	FlowDirection   []rl.Vector2
+	FlowFactor      []float32
 }
 type WorldParams struct {
 	Seed          int64
@@ -232,3 +256,128 @@ func blurByteSlice(bytes *[]byte, width, height, iterations int, holdout byte) *
 
 	return &readBuffer
 }
+
+// Finds distance to water and distance to land for each tile
+func findShoreDistances(heightMap []float64, world *World, maxDistR int) {
+
+	fWaterHeight := float64(world.WaterLine) / 255
+	width := world.X
+	for idx := range heightMap {
+		x, y := getPoint(idx, width)
+		currElev := heightMap[idx]
+
+		//Water or land value for tile that is checked
+		water := true
+
+		if currElev > fWaterHeight {
+			water = false
+			world.DistanceToLand[idx] = 0
+			world.DistanceToWater[idx] = byte(maxDistR)
+		} else {
+			world.DistanceToWater[idx] = 0
+			world.DistanceToLand[idx] = byte(maxDistR)
+		}
+
+	distanceFound:
+
+		// Check within a radius of r
+		for r := 1; r < maxDistR; r++ {
+
+			for dy := -r; dy <= r; dy++ {
+				for dx := -r; dx <= r; dx++ {
+
+					if dx < r && dy < r && dx > -r && dy > -r {
+						continue
+					}
+
+					didx := getIdx((x + dx), (y + dy), width)
+					if didx < 0 || didx > len(heightMap)-1 {
+						continue
+					}
+
+					locElev := heightMap[didx]
+
+					if water {
+						// Check  found land
+						if locElev > fWaterHeight {
+							world.DistanceToLand[idx] = byte(r)
+							break distanceFound
+						}
+
+					} else {
+						//Check found water
+						if locElev < fWaterHeight {
+							world.DistanceToWater[idx] = byte(r)
+							break distanceFound
+						}
+					}
+
+				}
+			}
+		}
+	}
+
+}
+func cubicInterpolate(y0, y1, y2, y3, mu float64) float64 {
+	var a0, a1, a2, a3 float64
+	mu2 := mu * mu
+
+	a0 = y3 - y2 - y0 + y1
+	a1 = y0 - y1 - a0
+	a2 = y2 - y0
+	a3 = y1
+
+	return clampF64(a0*mu*mu2+a1*mu2+a2*mu+a3, 0.0, 1.0)
+}
+
+// Small jobs helper functions
+// func getDistanceRow(buffer *sync.WaitGroup, wdist, ldist chan []byte, y, width, maxDistR int, heightMap []float64, fWaterHeight float64) {
+
+// 	defer buffer.Done()
+
+// 	ldistrow := make([]byte, width+1)
+// 	wdistrow := make([]byte, width+1)
+// 	row[0] = byte(y)
+// 	for i := 1; i < width+1; i++ {
+
+// 	distanceFound:
+// 		// Check within a radius of r
+// 		for r := 1; r < maxDistR; r++ {
+
+// 			for dy := -r; dy <= r; dy++ {
+// 				for dx := -r; dx <= r; dx++ {
+
+// 					if dx < r && dy < r && dx > -r && dy > -r {
+// 						continue
+// 					}
+
+// 					didx := getIdx((x + dx), (y + dy), width)
+// 					if didx < 0 || didx > len(heightMap)-1 {
+// 						continue
+// 					}
+
+// 					locElev := heightMap[didx]
+
+// 					if water {
+// 						// Check  found land
+// 						if locElev > fWaterHeight {
+// 							row[i] = byte(r)
+// 							break distanceFound
+// 						}
+
+// 					} else {
+// 						//Check found water
+// 						if locElev < fWaterHeight {
+// 							row[i] = byte(r)
+// 							break distanceFound
+// 						}
+// 					}
+
+// 				}
+// 			}
+// 		}
+
+// 	}
+
+// 	c <- row
+// }

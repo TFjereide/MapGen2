@@ -35,18 +35,21 @@ type InputContext struct {
 	SetModeTemperature     bool
 	SetModeMoisture        bool
 	SetModeDistanceToWater bool
+	SetModeFlow            bool
 }
 
 func newInputContext() InputContext {
 	return InputContext{
-		MoveLeft:           false,
-		MoveRight:          false,
-		MoveUp:             false,
-		MoveDown:           false,
-		SetModeColor:       false,
-		SetModeHeight:      false,
-		SetModeTemperature: false,
-		SetModeMoisture:    false}
+		MoveLeft:               false,
+		MoveRight:              false,
+		MoveUp:                 false,
+		MoveDown:               false,
+		SetModeColor:           false,
+		SetModeHeight:          false,
+		SetModeTemperature:     false,
+		SetModeMoisture:        false,
+		SetModeDistanceToWater: false,
+		SetModeFlow:            false}
 }
 
 // Other stuff the Gui needs to draw
@@ -71,6 +74,7 @@ const (
 	TEMPERATURE
 	MOISTURE
 	DISTANCE_TO_WATER
+	FLOW
 )
 
 var MODE_NAMES = [...]string{
@@ -78,7 +82,8 @@ var MODE_NAMES = [...]string{
 	"height",
 	"temperature",
 	"moisture",
-	"distance to water"}
+	"distance to water",
+	"flow"}
 
 var MODE int = COLOR
 
@@ -129,6 +134,8 @@ func setConsoleMode(input InputContext) {
 		MODE = MOISTURE
 	} else if input.SetModeDistanceToWater {
 		MODE = DISTANCE_TO_WATER
+	} else if input.SetModeFlow {
+		MODE = FLOW
 	}
 }
 
@@ -137,27 +144,40 @@ func updateConsoleVisuals(game *GameContainer) {
 	case COLOR:
 		game.Console.RenderFG = true
 		game.Console.RenderBG = true
+		game.Console.RenderVectors = false
 		game.Console.ExtractVisuals(game.World)
 	case TEMPERATURE:
 		game.Console.RenderFG = false
 		game.Console.RenderBG = true
+		game.Console.RenderVectors = false
 		game.Console.SetBG(common.ConvertArrayByteToRLColor(game.World.TempMap))
 		game.Console.UpdateTexture()
 	case HEIGHT:
 		game.Console.RenderFG = false
 		game.Console.RenderBG = true
+		game.Console.RenderVectors = false
 		game.Console.SetBG(common.ConvertArrayByteToRLColor(game.World.HeightMap))
 		game.Console.UpdateTexture()
 	case MOISTURE:
 		game.Console.RenderFG = false
 		game.Console.RenderBG = true
+		game.Console.RenderVectors = false
 		game.Console.SetBG(common.ConvertArrayByteToRLColor(game.World.MoistureMap))
 		game.Console.UpdateTexture()
 
 	case DISTANCE_TO_WATER:
 		game.Console.RenderFG = false
 		game.Console.RenderBG = true
+		game.Console.RenderVectors = false
 		game.Console.SetBG(common.ConvertArrayByteToRLColor(game.World.DistanceToWater))
+		game.Console.UpdateTexture()
+
+	case FLOW:
+		game.Console.RenderFG = false
+		game.Console.RenderBG = true
+		game.Console.RenderVectors = true
+		game.Console.SetBG(common.ConvertArrayByteToRLColor(game.World.HeightMap))
+		game.Console.VectorMap = game.World.FlowDirection
 		game.Console.UpdateTexture()
 	}
 }
@@ -185,6 +205,10 @@ func getInput(inputContext *InputContext) (bool, bool) {
 	if rl.IsKeyPressed(rl.KeyFive) {
 		changed = true
 		inputContext.SetModeDistanceToWater = true
+	}
+	if rl.IsKeyPressed(rl.KeySix) {
+		changed = true
+		inputContext.SetModeFlow = true
 	}
 	if rl.IsKeyDown(rl.KeyW) {
 		inputContext.MoveUp = true
@@ -367,22 +391,22 @@ func main() {
 		Bias:        0.45}
 
 	mountainMaskParams := goNoise.NoiseParams{
-		ScaleX:      40.0,
-		ScaleY:      20.0,
+		ScaleX:      50.0,
+		ScaleY:      30.0,
 		Octaves:     3,
 		Persistance: 0.5,
 		Lacunarity:  2.0,
 		Gain:        0.3,
-		Bias:        0.35}
+		Bias:        0.3}
 
 	mountainNoiseParams := goNoise.NoiseParams{
-		ScaleX:      20.0,
+		ScaleX:      15.0,
 		ScaleY:      10.0,
-		Octaves:     3,
+		Octaves:     4,
 		Persistance: 0.55,
 		Lacunarity:  2.2,
-		Gain:        0.4,
-		Bias:        0.5}
+		Gain:        0.35,
+		Bias:        0.35}
 
 	landNoiseParams := []goNoise.NoiseParams{
 		goNoise.NoiseParams{
@@ -418,13 +442,13 @@ func main() {
 		goNoise.NoiseParams{
 			Type:        goNoise.PERTURBED,
 			Weight:      0.6,
-			ScaleX:      50.0,
-			ScaleY:      20.0,
-			Octaves:     3,
+			ScaleX:      25.0,
+			ScaleY:      12.0,
+			Octaves:     8,
 			Persistance: 0.5,
 			Lacunarity:  2.0,
 			Gain:        0.5,
-			Bias:        0.5}}
+			Bias:        0.75}}
 
 	worldParams := worldgen.WorldParams{
 		Seed:          1,
