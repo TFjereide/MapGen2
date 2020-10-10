@@ -206,22 +206,26 @@ func (clayer *ConsoleLayer) ExtractVisuals(world *worldgen.World) {
 		//lightMap[i] *= 1.0
 
 		//lightMap[i] = 1.0 - ((1.0 - float32(FAKE_NORMALS_2D[clayer.VectorMap[i]])) * float32(math.Pow(float64(world.HeightMap[i])/255, 1.2)))
-		lightMap[i] = 1.0 - ((1.0 - float32(FAKE_NORMALS_2D[clayer.VectorMap[i]])) * float32(world.HeightMap[i]) / 255)
+		lightMap[i] = float32(FAKE_NORMALS_2D[clayer.VectorMap[i]])
 	}
 
 	for i := 0; i < (world.X * world.Y); i++ {
 
+		//-----Determine Colors ----
 		if world.HeightMap[i] > world.WaterLine {
 			// Land
 			waterHeight := float32(world.WaterLine) / 255.0
 			fHeight := float32(world.HeightMap[i]) / 255
 			waterRatioCorrected := (fHeight - waterHeight) * (1.0 / waterHeight)
+
+			shadowFactor := waterRatioCorrected
 			waterRatioCorrected *= 0.55
+
+			brightness := (1.0 - lightMap[i]) * float32(shadowFactor*0.6)
+			brightness = 1.0 - brightness
+
 			//brightness := 1.0 - waterRatioCorrected // brighter further down
 			//brightness := (fHeight * 0.5) + 0.5 // brighter further up
-
-			shadowFactor := 1.0 * (fHeight)
-			brightness := (lightMap[i] * float32(shadowFactor)) + float32(1.0-shadowFactor)
 
 			biomeColBg := worldgen.BIOME_BG_COLORS[world.BiomeMap[i]]
 			biomeColFg := worldgen.BIOME_FG_COLORS[world.BiomeMap[i]]
@@ -252,6 +256,7 @@ func (clayer *ConsoleLayer) ExtractVisuals(world *worldgen.World) {
 			fgColormap[i] = common.ColorFloat32Multiply(fgCol, 1.0+(clayer.RandWeight[i]*2.0))
 		}
 
+		//-----Determine Symbols ----
 		if world.DistanceToLand[i] != 1 {
 			str := worldgen.BIOME_SYMBOLS[world.BiomeMap[i]]
 			runes := []rune(str)
@@ -261,10 +266,51 @@ func (clayer *ConsoleLayer) ExtractVisuals(world *worldgen.World) {
 			} else {
 				runechar = runes[0]
 			}
-
 			asciibyte := IBM_437_ASCII_MAP[string(runechar)]
-
 			symMap[i] = asciibyte
+
+			//River tiles
+			smallRiverThreshold := 0.02
+			bigRiverThreshold := 0.25
+			var bitMask byte = 0
+			up := i - world.X
+			down := i + world.X
+			left := i - 1
+			right := i + 1
+
+			//		1
+			//	2	0	4
+			//		8
+			if intInSlice(up, world.FlowsFrom[i]) || world.FlowsTo[i] == up { // Up
+				if world.FlowStrength[up] > smallRiverThreshold {
+					bitMask += 1
+				}
+			}
+			if intInSlice(down, world.FlowsFrom[i]) || world.FlowsTo[i] == down { // Down
+				if world.FlowStrength[down] > smallRiverThreshold {
+					bitMask += 8
+				}
+			}
+			if intInSlice(left, world.FlowsFrom[i]) || world.FlowsTo[i] == left { //Left
+				if world.FlowStrength[left] > smallRiverThreshold {
+					bitMask += 2
+				}
+			}
+			if intInSlice(right, world.FlowsFrom[i]) || world.FlowsTo[i] == right { // Right
+				if world.FlowStrength[right] > smallRiverThreshold {
+					bitMask += 4
+				}
+			}
+			if bitMask != 0 {
+
+				if world.FlowStrength[i] > bigRiverThreshold {
+					fgColormap[i] = worldgen.RIVER_FG_COLOR
+					symMap[i] = IBM_437_ASCII_MAP[BitMaskThick[bitMask]]
+				} else if world.FlowStrength[i] > smallRiverThreshold {
+					fgColormap[i] = worldgen.RIVER_FG_COLOR
+					symMap[i] = IBM_437_ASCII_MAP[BitMaskThin[bitMask]]
+				}
+			}
 
 		} else {
 			var bitMask byte = 0
@@ -288,8 +334,10 @@ func (clayer *ConsoleLayer) ExtractVisuals(world *worldgen.World) {
 	}
 
 	//TODO: Fix edge errors
+	//clayer.BgCol = bgColormap
+	//clayer.FgCol = fgColormap
 	clayer.BgCol = common.BlurColorSlice(bgColormap, world.X, world.Y, 0.2)
-	clayer.FgCol = common.BlurColorSlice(fgColormap, world.X, world.Y, 0.15)
+	clayer.FgCol = common.BlurColorSlice(fgColormap, world.X, world.Y, 0.05)
 	clayer.Symbol = symMap
 	clayer.UpdateTexture()
 
@@ -351,4 +399,12 @@ func pmod(x, b int) int {
 func easeOutQuad(x float64) float64 {
 	return 1.0 - (1.0-x)*(1.0-x)
 
+}
+func intInSlice(a int, list []int) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }

@@ -46,7 +46,7 @@ func BlurColorSlice(colors []rl.Color, width, height int, blurAmount float32) []
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
 
-			idx := getIdx(x, y, width)
+			idx := GetIdx(x, y, width)
 			currCol := colors[idx]
 
 			for dy := -1; dy < 2; dy++ {
@@ -56,7 +56,7 @@ func BlurColorSlice(colors []rl.Color, width, height int, blurAmount float32) []
 						if x+dx < 0 || x+dx >= width || y+dy < 0 || y+dy >= height {
 							continue
 						}
-						_idx := getIdx(x+dx, y+dy, width)
+						_idx := GetIdx(x+dx, y+dy, width)
 						mixCol := colors[_idx]
 						currCol = ColorMixWeighted(mixCol, currCol, blurAmount)
 
@@ -114,16 +114,16 @@ func ColorAddWeighted(fc, sc rl.Color, weight float32) rl.Color {
 	return col
 }
 func ColorFloat32Multiply(c rl.Color, brightness float32) rl.Color {
-	c.R = byte(clampF32(float32(c.R)*brightness, 0.0, 255.0))
-	c.G = byte(clampF32(float32(c.G)*brightness, 0.0, 255.0))
-	c.B = byte(clampF32(float32(c.B)*brightness, 0.0, 255.0))
+	c.R = byte(ClampF32(float32(c.R)*brightness, 0.0, 255.0))
+	c.G = byte(ClampF32(float32(c.G)*brightness, 0.0, 255.0))
+	c.B = byte(ClampF32(float32(c.B)*brightness, 0.0, 255.0))
 	return c
 }
 func ColorByteMultiply(c rl.Color, brightness byte) rl.Color {
 	bBrightness := float32(brightness) / 255.0
-	c.R = byte(clampF32(float32(c.R)*bBrightness, 0.0, 255.0))
-	c.G = byte(clampF32(float32(c.G)*bBrightness, 0.0, 255.0))
-	c.B = byte(clampF32(float32(c.B)*bBrightness, 0.0, 255.0))
+	c.R = byte(ClampF32(float32(c.R)*bBrightness, 0.0, 255.0))
+	c.G = byte(ClampF32(float32(c.G)*bBrightness, 0.0, 255.0))
+	c.B = byte(ClampF32(float32(c.B)*bBrightness, 0.0, 255.0))
 	return c
 }
 
@@ -150,14 +150,36 @@ func Float64ToGrayColor(v float64) rl.Color {
 	return rl.NewColor(uint8(v*255), uint8(v*255), uint8(v*255), 255)
 }
 
-func getIdx(x, y, width int) int {
+func GetIdx(x, y, width int) int {
 	return ((y * width) + x)
 }
-func clampF32(val, bottom, top float32) float32 {
+func ClampF32(val, bottom, top float32) float32 {
 	if val > top {
 		return top
 	} else if val < bottom {
 		return bottom
 	}
 	return val
+}
+func ClampF64(val, bottom, top float64) float64 {
+	if val > top {
+		return top
+	} else if val < bottom {
+		return bottom
+	}
+	return val
+}
+
+// Will curve the value towards a value in a smooth fashion
+func GetBias(time, bias float64) float64 {
+	return (time / ((((1.0 / bias) - 2.0) * (1.0 - time)) + 1.0))
+}
+
+// Will curve value above and below 0.5 towards another
+func GetGain(time, gain float64) float64 {
+	if time < 0.5 {
+		return GetBias(time*2.0, gain) / 2.0
+	} else {
+		return GetBias(time*2.0-1.0, 1.0-gain)/2.0 + 0.5
+	}
 }
