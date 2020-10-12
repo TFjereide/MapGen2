@@ -8,33 +8,33 @@ import (
 
 //  Actions performed through normal inputs
 type InputContext struct {
-	MouseX, MouseY         int32
-	MoveLeft               bool
-	MoveRight              bool
-	MoveUp                 bool
-	MoveDown               bool
-	WorldSizeIncrease      bool
-	WorldSizeDecrease      bool
-	SetModeColor           bool
-	SetModeHeight          bool
-	SetModeTemperature     bool
-	SetModeMoisture        bool
-	SetModeDistanceToWater bool
-	SetModeFlow            bool
+	MouseX, MouseY     int32
+	MoveLeft           bool
+	MoveRight          bool
+	MoveUp             bool
+	MoveDown           bool
+	WorldSizeIncrease  bool
+	WorldSizeDecrease  bool
+	SetModeColor       bool
+	SetModeHeight      bool
+	SetModeTemperature bool
+	SetModeMoisture    bool
+	SetModeWatersheds  bool
+	SetModeFlow        bool
 }
 
 func NewInputContext() InputContext {
 	return InputContext{
-		MoveLeft:               false,
-		MoveRight:              false,
-		MoveUp:                 false,
-		MoveDown:               false,
-		SetModeColor:           false,
-		SetModeHeight:          false,
-		SetModeTemperature:     false,
-		SetModeMoisture:        false,
-		SetModeDistanceToWater: false,
-		SetModeFlow:            false}
+		MoveLeft:           false,
+		MoveRight:          false,
+		MoveUp:             false,
+		MoveDown:           false,
+		SetModeColor:       false,
+		SetModeHeight:      false,
+		SetModeTemperature: false,
+		SetModeMoisture:    false,
+		SetModeWatersheds:  false,
+		SetModeFlow:        false}
 }
 
 func GetInput(inputContext *InputContext) (bool, bool) {
@@ -59,7 +59,7 @@ func GetInput(inputContext *InputContext) (bool, bool) {
 	}
 	if rl.IsKeyPressed(rl.KeyFive) {
 		changed = true
-		inputContext.SetModeDistanceToWater = true
+		inputContext.SetModeWatersheds = true
 	}
 	if rl.IsKeyPressed(rl.KeySix) {
 		changed = true
@@ -103,8 +103,8 @@ func SetConsoleMode(input InputContext) int {
 		return TEMPERATURE
 	} else if input.SetModeMoisture {
 		return MOISTURE
-	} else if input.SetModeDistanceToWater {
-		return DISTANCE_TO_WATER
+	} else if input.SetModeWatersheds {
+		return WATERSHEDS
 	} else if input.SetModeFlow {
 		return FLOW
 	}
@@ -137,11 +137,24 @@ func UpdateConsoleVisuals(game *GameContainer, mode int) {
 		game.Console.SetBG(common.ConvertArrayByteToRLColor(game.World.MoistureMap))
 		game.Console.UpdateTexture()
 
-	case DISTANCE_TO_WATER:
+	case WATERSHEDS:
 		game.Console.RenderFG = false
 		game.Console.RenderBG = true
 		game.Console.RenderVectors = false
-		game.Console.SetBG(common.ConvertArrayByteToRLColor(game.World.DistanceToWater))
+
+		//bytearray := make([]byte, len(game.World.DistanceToLand))
+		//for i, v := range game.World.DistanceToLand {
+		//	bytearray[i] = v * 10
+		//}
+		colbuffer := make([]rl.Color, len(game.World.Watershed))
+
+		for i, v := range game.World.Watershed {
+			col := game.Console.RandColors[v]
+			col.A = uint8(((game.World.FlowStrength[i] * 0.5) + 0.5) * 255.0)
+
+			colbuffer[i] = col
+		}
+		game.Console.SetBG(colbuffer)
 		game.Console.UpdateTexture()
 
 	case FLOW:
@@ -165,15 +178,16 @@ func DrawMousePointer(game *GameContainer, inputContext InputContext, fontWidth,
 		worldMousePosY = 0
 	}
 
-	var biomeStr, heightStr, tempStr, moistureStr string
+	var biomeStr, heightStr, tempStr, moistureStr, distStr string
 	if worldMousePosX > 0 && worldMousePosX < mapWidth && worldMousePosY > 0 && worldMousePosY < mapHeight {
 		biomeStr = game.World.GetBiomeAtPoint(int(worldMousePosX), int(worldMousePosY))
 		heightStr = fmt.Sprintf("%.2f", float32(game.World.GetHeightAtPoint(int(worldMousePosX), int(worldMousePosY)))/255.0)
 		moistureStr = fmt.Sprintf("%.2f", float32(game.World.GetMoistureAtPoint(int(worldMousePosX), int(worldMousePosY)))/255.0)
 		tempStr = fmt.Sprintf("%.2f", float32(game.World.GetTemperatureAtPoint(int(worldMousePosX), int(worldMousePosY)))/255.0)
+		distStr = fmt.Sprintf("%d", game.World.GetDistToLandAtPoint(int(worldMousePosX), int(worldMousePosY)))
 	}
 
-	rl.DrawText(biomeStr+" -- Height: "+heightStr+"/1.0"+" Temp: "+tempStr+"/1.0"+" Moisture: "+moistureStr+"/1.0",
+	rl.DrawText(biomeStr+" -- Height: "+heightStr+"/1.0"+" Temp: "+tempStr+"/1.0"+" Moisture: "+moistureStr+"/1.0 -d:"+distStr,
 		worldMousePosX*fontWidth-4, worldMousePosY*fontHeight-12, 8, rl.White)
 
 	rl.DrawRectangleLines(

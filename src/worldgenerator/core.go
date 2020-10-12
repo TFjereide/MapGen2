@@ -1,6 +1,7 @@
 package worldgenerator
 
 import (
+	"common"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -41,6 +42,7 @@ type World struct {
 	FlowsTo      []int
 	FlowsFrom    [][]int
 	FlowStrength []float64
+	Watershed    []int32
 }
 type WorldParams struct {
 	Seed          int64
@@ -91,6 +93,18 @@ func (world *World) GetFlowFromAtPoint(x, y int) []int {
 		return []int{}
 	}
 	return world.FlowsFrom[getIdx(x, y, world.X)]
+}
+func (world *World) GetDistToWaterAtPoint(x, y int) byte {
+	if x < 0 || y < 0 || x > world.X || y > world.Y {
+		return 0
+	}
+	return world.DistanceToWater[getIdx(x, y, world.X)]
+}
+func (world *World) GetDistToLandAtPoint(x, y int) byte {
+	if x < 0 || y < 0 || x > world.X || y > world.Y {
+		return 0
+	}
+	return world.DistanceToLand[getIdx(x, y, world.X)]
 }
 
 func clampF64(val, bottom, top float64) float64 {
@@ -171,7 +185,7 @@ func blurByteSlice(bytes *[]byte, width, height, iterations int, holdout byte) *
 }
 
 // Finds distance to water and distance to land for each tile
-func findShoreDistances(heightMap []float64, world *World, maxDistR int) {
+func _findShoreDistances(heightMap []float64, world *World, maxDistR int) {
 
 	fWaterHeight := float64(world.WaterLine) / 255
 	width := world.X
@@ -231,6 +245,104 @@ func findShoreDistances(heightMap []float64, world *World, maxDistR int) {
 	}
 
 }
+
+func findShoreDistances(heightMap []float64, world *World, params WorldParams, maxDistR int) {
+
+	landtiles := *common.NewUnsafeIntQueue()
+	watertiles := *common.NewUnsafeIntQueue()
+
+	size := len(heightMap)
+	for i := 0; i < size; i++ {
+
+		v := heightMap[i]
+
+		if v > params.FWaterHeight {
+			// Land
+			currentIdxNeighbors := getIdxNeighboursDiagonal(i, params.Width)
+			has_water_neighbour := false
+			for _, next := range currentIdxNeighbors {
+				if next < 0 || next >= size || heightMap[next] > params.FWaterHeight {
+					continue
+				}
+				has_water_neighbour = true
+			}
+			if has_water_neighbour {
+				landtiles.Add(i)
+				world.DistanceToWater[i] = byte(1)
+			} else {
+				world.DistanceToWater[i] = byte(maxDistR)
+
+			}
+			world.DistanceToLand[i] = 0
+		}
+	}
+	for i := 0; i < size; i++ {
+		v := heightMap[i]
+
+		if v < params.FWaterHeight {
+			//Water
+			currentIdxNeighbors := getIdxNeighboursDiagonal(i, params.Width)
+			has_land_neighbour := false
+			for _, next := range currentIdxNeighbors {
+				if next < 0 || next >= size || heightMap[next] < params.FWaterHeight {
+					continue
+				}
+				has_land_neighbour = true
+			}
+			if has_land_neighbour {
+				watertiles.Add(i)
+				world.DistanceToLand[i] = byte(1)
+			} else {
+				world.DistanceToLand[i] = byte(maxDistR)
+			}
+			world.DistanceToWater[i] = 0
+		}
+
+	}
+	// check dist to water
+	for i := 1; i < (maxDistR); i++ {
+		_landtiles := make([]int, 0)
+		_watertiles := make([]int, 0)
+
+		for landtiles.Size() != 0 {
+
+			currTile := landtiles.PopStart()
+
+			for _, next := range getIdxNeighbours(currTile, params.Width) {
+				if next < 0 || next >= size {
+					continue
+				}
+
+				if world.DistanceToWater[next] > byte(i) {
+					world.DistanceToWater[next] = byte(i + 1)
+					_landtiles = append(_landtiles, next)
+				}
+			}
+		}
+		landtiles.Items = _landtiles
+
+		// check dist to land
+
+		for watertiles.Size() != 0 {
+
+			currTile := watertiles.PopStart()
+
+			for _, next := range getIdxNeighbours(currTile, params.Width) {
+				if next < 0 || next >= size {
+					continue
+				}
+
+				if world.DistanceToLand[next] > byte(i) {
+					world.DistanceToLand[next] = byte(i + 1)
+					_watertiles = append(_watertiles, next)
+
+				}
+			}
+		}
+		watertiles.Items = _watertiles
+	}
+}
+
 func cubicInterpolate(y0, y1, y2, y3, mu float64) float64 {
 	var a0, a1, a2, a3 float64
 	mu2 := mu * mu

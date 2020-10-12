@@ -3,7 +3,7 @@ package worldgenerator
 import (
 	"common"
 	"fmt"
-	"math/rand"
+	//"math/rand"
 	"time"
 )
 
@@ -21,9 +21,9 @@ func generateWatersheds(world *World, parameters WorldParams, pheightMap, pMoist
 		}
 	}
 
-	rand.Shuffle(len(shoreline), func(i, j int) {
-		shoreline[i], shoreline[j] = shoreline[j], shoreline[i]
-	})
+	//rand.Shuffle(len(shoreline), func(i, j int) {
+	//	shoreline[i], shoreline[j] = shoreline[j], shoreline[i]
+	//})
 
 	width := parameters.Width
 	height := parameters.Height
@@ -40,9 +40,10 @@ func generateWatersheds(world *World, parameters WorldParams, pheightMap, pMoist
 	flowStrength := make([]float64, size)
 	maxFlow := 0.0
 	maxCost := 0.0
-	maxPossibleCost := 10000.0
+	maxPossibleCost := 6.0
+	world.Watershed = make([]int32, size)
 
-	numWatersheds := 600
+	numWatersheds := 200
 	finishedWatersheds := 0
 	interval := len(shoreline) / numWatersheds
 
@@ -95,6 +96,7 @@ func generateWatersheds(world *World, parameters WorldParams, pheightMap, pMoist
 			//Assign current tile as taken
 			totalTakenTiles[currTile] = watershedIdx
 			watershedSize[ws]++
+			world.Watershed[currTile] = int32(ws)
 
 			//Check all the neighbours
 			currentIdxNeighbors := getIdxNeighbours(currTile, width)
@@ -111,6 +113,7 @@ func generateWatersheds(world *World, parameters WorldParams, pheightMap, pMoist
 					alreadyThere := givesWaterTo[next]
 					if alreadyThere != -1 || totalTakenTiles[next] != 0 || heightMap[next] > 0.7 ||
 						heightMap[next] < fWaterHeight || newCost > maxPossibleCost {
+
 						rejected++
 						continue
 					}
@@ -129,7 +132,6 @@ func generateWatersheds(world *World, parameters WorldParams, pheightMap, pMoist
 				watershedEnds[ws] = append(watershedEnds[ws], currTile)
 			}
 		}
-
 	}
 	for i := range givesWaterTo {
 		if givesWaterTo[i] == -1 {
@@ -146,8 +148,9 @@ func generateWatersheds(world *World, parameters WorldParams, pheightMap, pMoist
 			perTileFlow := 0.01
 
 			for current != 0 {
-				accFlow += perTileFlow
-				flowStrength[current] += (accFlow + (moistureMap[current] * 0.6))
+				accFlow += (perTileFlow + (moistureMap[current]))
+
+				flowStrength[current] += accFlow
 
 				if flowStrength[current] > maxFlow {
 					maxFlow = flowStrength[current]
@@ -160,17 +163,18 @@ func generateWatersheds(world *World, parameters WorldParams, pheightMap, pMoist
 	// Figure out the flows of watersheds
 	for i, _ := range flowStrength {
 		flowStrength[i] /= maxFlow
-		if flowStrength[i] > 0.001 {
+		if flowStrength[i] != 0.0 {
 
-			moistureMap[i] = (moistureMap[i] + (flowStrength[i] * 0.5))
+			moistureMap[i] = clampF64(moistureMap[i]+(flowStrength[i]*0.5), 0.0, 1.0)
 
 			for _, n := range getIdxNeighbours(i, width) {
 				if n >= size || n < 0 {
 					continue
 				}
-				moistureMap[n] = (moistureMap[n] + (flowStrength[i] * 0.25))
+				moistureMap[n] = clampF64(moistureMap[n]+(flowStrength[i]*0.25), 0.0, 1.0)
+
 				if heightMap[n] > parameters.FWaterHeight+0.1 {
-					heightMap[n] *= 1.0 - (flowStrength[i] * 0.25)
+					heightMap[n] *= 1.0 - (flowStrength[i] * 0.01)
 				}
 			}
 		}
@@ -344,9 +348,11 @@ func estimateCost(current, next int, heightMap *[]float64, distanceToWater *[]by
 
 	elevationCost := (_heightMap[current] - _heightMap[next]) // if next is higher the cost is negative
 	if elevationCost > 0.0 {
-		elevationCost *= 100.0
+		elevationCost *= 25.0
 
 	}
+	//elevationCost += _heightMap[next]
+
 	newCost := _costSoFar[current] + elevationCost
 	if _distanceToWater[next] < 2 {
 		newCost += 1.0

@@ -92,8 +92,11 @@ func GenerateWorld(
 
 	// Find distance to water and land
 	start = time.Now().UnixNano() / 1000000
-	maxDistR := 8
-	findShoreDistances(heightMap, &world, maxDistR)
+	maxDistR := 12
+
+	//_findShoreDistances(heightMap, &world, maxDistR)
+	findShoreDistances(heightMap, &world, params, maxDistR)
+
 	t = time.Now().UnixNano() / 1000000
 	fmt.Println("Distance calc msec: ", t-start)
 
@@ -102,6 +105,8 @@ func GenerateWorld(
 		distToWater := easeOutQuad(float64(world.DistanceToWater[i]) / float64(maxDistR+2))
 		heightMap[i] += (mountainNoise[i] * mountainMask[i] * distToWater) * (1.0 - highest_num)
 	}
+	heightMap = *fillDimples(&world, params, &heightMap)
+	generateNormals(&world, params, &heightMap)
 
 	//Temperature
 	for i := 0; i < len(tempMap); i++ {
@@ -175,7 +180,9 @@ func GenerateWorld(
 	}
 
 	generateWatersheds(&world, params, &heightMap, &moistMap)
-	generateNormals(&world, params, &heightMap)
+	//world.FlowStrength = make([]float64, width*height)
+	//world.FlowsFrom = make([][]int, width*height)
+	//world.FlowsTo = make([]int, width*height)
 
 	start = time.Now().UnixNano() / 1000000
 
@@ -291,6 +298,7 @@ func determineBiome(precipitation, cTemp float64, height, waterLine, mountainLin
 }
 
 func generateNormals(world *World, parameters WorldParams, pheightMap *[]float64) {
+	start := time.Now().UnixNano() / 1000000
 
 	width := parameters.Width
 	height := parameters.Height
@@ -332,6 +340,60 @@ func generateNormals(world *World, parameters WorldParams, pheightMap *[]float64
 
 		}
 	}
+	t := time.Now().UnixNano() / 1000000
+	fmt.Println("Generate Normals msec: ", t-start)
+
+}
+func fillDimples(world *World, parameters WorldParams, pheightMap *[]float64) *[]float64 {
+	start := time.Now().UnixNano() / 1000000
+	width := parameters.Width
+	height := parameters.Height
+	heightMap := *pheightMap
+	for i := 0; i < 8; i++ {
+		for y := 1; y < height-1; y++ {
+			for x := 1; x < width-1; x++ {
+
+				idx := getIdx(x, y, width)
+				currHeight := heightMap[idx]
+				if currHeight < parameters.FWaterHeight {
+					continue
+				}
+				lowHeight := currHeight
+				dir := rl.Vector2{0, 0}
+				undimpleHeight := 0.0
+
+				//Find lowestPoint adjacent
+				for dy := -1; dy < 2; dy++ {
+					for dx := -1; dx < 2; dx++ {
+						if dx != 0 && dy != 0 {
+
+							if x+dx < 0 || x+dx >= width || y+dy < 0 || y+dy >= height {
+								continue
+							}
+							_idx := getIdx(x+dx, y+dy, width)
+							checkHeight := heightMap[_idx]
+							if checkHeight < lowHeight {
+								lowHeight = checkHeight
+								dir.X = float32(dx)
+								dir.Y = float32(dy)
+							}
+							undimpleHeight += checkHeight
+
+						}
+					}
+				}
+				//Dimple confirmed!
+				if dir == (rl.Vector2{0, 0}) {
+					undimpleHeight /= 4
+					heightMap[idx] = undimpleHeight
+				}
+
+			}
+		}
+	}
+	t := time.Now().UnixNano() / 1000000
+	fmt.Println("FillDimples msec: ", t-start)
+	return &heightMap
 
 }
 

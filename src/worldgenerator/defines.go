@@ -133,7 +133,7 @@ var BIOME_SYMBOLS = [...]string{
 	`░░░░░░░░░▒▓♣♣♠"`,                 // savannah
 	`≈░░¾≈`} // wetland
 
-var RIVER_FG_COLOR = rl.NewColor(20, 140, 170, 255)
+var RIVER_FG_COLOR = rl.NewColor(20, 140, 170, 150)
 
 // TODO: implement temp scaling to real world celsius
 const MAX_TEMP_C = 40

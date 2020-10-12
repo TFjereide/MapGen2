@@ -13,8 +13,8 @@ import (
 
 const fontWidth = 8
 const fontHeight = 8
-const mapWidth = 1024 //512
-const mapHeight = 512 //256
+const mapWidth = 512  //512
+const mapHeight = 256 //256
 
 func main() {
 
@@ -220,7 +220,7 @@ func main() {
 
 		// Drawing GUI
 		guiResponseBuffer = g.DrawGui(guiData, guiResponseBuffer, MODE)
-		g.DrawMinimap(&game, fontWidth, fontHeight, 0.2, true)
+		g.DrawMinimap(&game, fontWidth, fontHeight, 0.5, true)
 		// Minimap
 
 		rl.EndDrawing()

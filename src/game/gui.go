@@ -12,7 +12,7 @@ const (
 	HEIGHT
 	TEMPERATURE
 	MOISTURE
-	DISTANCE_TO_WATER
+	WATERSHEDS
 	FLOW
 )
 
@@ -21,7 +21,7 @@ var MODE_NAMES = [...]string{
 	"height",
 	"temperature",
 	"moisture",
-	"distance to water",
+	"watersheds",
 	"flow"}
 
 // Other stuff the Gui needs to draw

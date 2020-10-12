@@ -32,6 +32,8 @@ type ConsoleLayer struct {
 	RenderFG      bool
 	RenderBG      bool
 	RenderVectors bool
+
+	RandColors []rl.Color
 }
 
 func NewSpriteSheetFont(tex rl.Texture2D, width, height int32) SpriteSheetFont {
@@ -56,11 +58,17 @@ func NewConsoleLayer(width, height int, font SpriteSheetFont) *ConsoleLayer {
 		BgCol:          make([]rl.Color, size),
 		VectorMap:      make([]rl.Vector2, size),
 		VectorStrength: make([]float32, size),
-		RandWeight:     make([]float32, size)}
+		RandWeight:     make([]float32, size),
+		RandColors:     make([]rl.Color, 1000),
+	}
 
 	for i := 0; i < size; i++ {
 		clayer.RandWeight[i] = 0.0 + (rand.Float32() * 0.18)
 	}
+	for i, _ := range clayer.RandColors {
+		clayer.RandColors[i] = rl.NewColor(uint8(rand.Float32()*255.0), uint8(rand.Float32()*255.0), uint8(rand.Float32()*255.0), 255)
+	}
+
 	return &clayer
 }
 

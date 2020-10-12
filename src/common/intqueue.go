@@ -40,3 +40,33 @@ func (self *IntQueue) IsEmpty() bool {
 func (self *IntQueue) Size() int {
 	return len(self.items)
 }
+
+type UnsafeIntQueue struct {
+	Items []int
+}
+
+func NewUnsafeIntQueue() *UnsafeIntQueue {
+	return &UnsafeIntQueue{Items: []int{}}
+}
+
+func (self *UnsafeIntQueue) Add(i int) {
+	self.Items = append(self.Items, i)
+}
+
+func (self *UnsafeIntQueue) PopStart() int {
+	i := self.Items[0]
+	self.Items = self.Items[1:len(self.Items)]
+	return i
+}
+func (self *UnsafeIntQueue) Front() int {
+	i := self.Items[0]
+	return i
+}
+
+func (self *UnsafeIntQueue) IsEmpty() bool {
+	return len(self.Items) == 0
+}
+
+func (self *UnsafeIntQueue) Size() int {
+	return len(self.Items)
+}
