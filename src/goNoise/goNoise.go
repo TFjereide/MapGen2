@@ -13,13 +13,15 @@ const (
 	RIDGED
 	NEGATIVE_RIDGED
 	PERTURBED
+	NONE
 )
 
 var NOISETYPE_STRING = [...]string{
 	"FBM",
-	"+RIDGED",
-	"-RIDGED",
-	"PERTURBED"}
+	"HILL",
+	"RIDGED",
+	"PERTURBED",
+	"NONE"}
 
 type NoiseParams struct {
 	Type        NoiseType
@@ -53,7 +55,7 @@ func GetLayeredNoise(width, height int, parameters []NoiseParams, scale float64)
 		} else if parameters[i].Type == NEGATIVE_RIDGED {
 			noiseLayers[i] = *GenRidgedFBMParalell(width, height, parameters[i], scale, true, 0.2)
 		} else if parameters[i].Type == PERTURBED {
-			noiseLayers[i] = *GenPerturbedFBMParalell(width, height, parameters[i], scale, 0.25)
+			noiseLayers[i] = *GenPerturbedFBMParalell(width, height, parameters[i], scale, 1.0)
 		}
 	}
 
@@ -87,7 +89,7 @@ func GenFBM(width int, height int, context NoiseParams, scale float64) *[]float6
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
 
-			noiseHeight := getFBM(noise, x, y, context, scale)
+			noiseHeight := getFBM(&noise, x, y, context, scale)
 			if noiseHeight > maxNoiseHeight {
 				maxNoiseHeight = noiseHeight
 			} else if noiseHeight < minNoiseHeight {
@@ -181,7 +183,7 @@ func GenPerturbedFBM(width int, height int, context NoiseParams, scale float64, 
 			frequency := 1.0
 			noiseHeight := 0.0
 
-			perturbation := getFBM(noise, x, y, perturbContext, scale) * perturbAmount
+			perturbation := getFBM(&noise, x, y, perturbContext, scale) * perturbAmount
 
 			// get new value
 			for i := 0; i < context.Octaves; i++ {

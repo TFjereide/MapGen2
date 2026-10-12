@@ -31,13 +31,11 @@ type GuiData struct {
 
 // Changes returned by RayGui's lil' widgets
 type GuiResponseBuffer struct {
-	Changed      bool
-	Seed         *int64
-	WorldScale   *float64
-	NoiseTypes   []*goNoise.NoiseType
-	NoiseWeights []*float32
-	NoiseBias    []*float64
-	NoiseGain    []*float64
+	Changed     bool
+	Seed        *int64
+	WorldScale  *float64
+	NoiseNames  []string
+	NoiseParams []*goNoise.NoiseParams
 }
 
 func DrawMinimap(game *GameContainer, fontWidth, fontHeight int32, scale float32, drawRect bool) {
@@ -57,13 +55,19 @@ func DrawMinimap(game *GameContainer, fontWidth, fontHeight int32, scale float32
 			rl.Red)
 	}
 }
-func DrawGui(data GuiData, buffer GuiResponseBuffer, mode int) GuiResponseBuffer {
+func DrawGui(buffer *GuiResponseBuffer, mode int) {
 
 	guiOffsetX := float32(8)
 	guiOffsetY := float32(8)
 	offsetIncrement := float32(18)
-	offsetIncrementX := float32(4)
+	offsetIncrementX := float32(8)
 	changed := false
+
+	elementsHeight := float32(0.0)
+	for range buffer.NoiseParams {
+		elementsHeight += (offsetIncrement * 4)
+	}
+	rl.DrawRectangle(4, 4, 180, int32(elementsHeight+60.0), rl.Color{125, 125, 125, 125})
 
 	// fps widget
 	fps := rl.GetFPS()
@@ -95,7 +99,6 @@ func DrawGui(data GuiData, buffer GuiResponseBuffer, mode int) GuiResponseBuffer
 	guiOffsetX -= 45
 	guiOffsetY += offsetIncrement
 
-	// TODO: World scale corruption bug
 	// WorldscaleWidget
 	rect := rl.NewRectangle(guiOffsetX, guiOffsetY, 60, 18)
 	rayGui.LabelEx(rect, "WorldScale", rl.RayWhite, rl.Gray, rl.Gray)
@@ -111,64 +114,65 @@ func DrawGui(data GuiData, buffer GuiResponseBuffer, mode int) GuiResponseBuffer
 	guiOffsetY += offsetIncrement
 
 	// NoiseWeights
-	rayGui.LabelEx(rl.NewRectangle(guiOffsetX, guiOffsetY, 100, 18), "Noise Layer Weights:", rl.RayWhite, rl.Gray, rl.Gray)
-	guiOffsetY += offsetIncrement
-	guiOffsetX += offsetIncrementX
-	for i := range buffer.NoiseWeights {
-		labelSizeX := float32(65)
-		rayGui.LabelEx(rl.NewRectangle(guiOffsetX, guiOffsetY, labelSizeX, 18), goNoise.NOISETYPE_STRING[*buffer.NoiseTypes[i]], rl.RayWhite, rl.Gray, rl.Gray)
 
-		rect = rl.NewRectangle(guiOffsetX+labelSizeX, guiOffsetY, 100, 18)
-		oldWeight := *buffer.NoiseWeights[i]
-		*buffer.NoiseWeights[i] = rayGui.SliderBar(rect, *buffer.NoiseWeights[i], 0.0, 1.0)
-		if *buffer.NoiseWeights[i] != oldWeight {
-			changed = true
+	guiOffsetY += offsetIncrement
+
+	for i, _ := range buffer.NoiseParams {
+
+		param := buffer.NoiseParams[i]
+		str := buffer.NoiseNames[i]
+
+		//Draw Type
+		lStr := str + goNoise.NOISETYPE_STRING[param.Type]
+		rayGui.LabelEx(rl.NewRectangle(guiOffsetX, guiOffsetY, 100, 18), lStr, rl.RayWhite, rl.Gray, rl.Gray)
+		guiOffsetY += offsetIncrement
+		guiOffsetX += offsetIncrementX
+
+		//Draw weight
+		labelSizeX := float32(40)
+		if param.Weight != -1.0 {
+			rayGui.LabelEx(rl.NewRectangle(guiOffsetX, guiOffsetY, labelSizeX, 18), "Weight", rl.RayWhite, rl.Blank, rl.Blank)
+			rect = rl.NewRectangle(labelSizeX+guiOffsetX, guiOffsetY, 100, 18)
+			oldWeight := param.Weight
+			param.Weight = rayGui.SliderBar(rect, param.Weight, 0.0, 1.0)
+			if param.Weight != oldWeight {
+				changed = true
+			}
+			rayGui.Label(rect, fmt.Sprintf("%.3f", param.Weight))
+			guiOffsetY += offsetIncrement
 		}
 
-		rayGui.Label(rect, fmt.Sprintf("%.3f", *buffer.NoiseWeights[i]))
+		//Draw Bias
+		rayGui.LabelEx(rl.NewRectangle(guiOffsetX, guiOffsetY, labelSizeX, 18), "Bias", rl.RayWhite, rl.Blank, rl.Blank)
+		rect = rl.NewRectangle(labelSizeX+guiOffsetX, guiOffsetY, 100, 18)
+		oldBias := param.Bias
+		param.Bias = float64(rayGui.SliderBar(rect, float32(param.Bias), 0.0, 1.0))
+		if param.Bias != oldBias {
+			changed = true
+		}
+		rayGui.Label(rect, fmt.Sprintf("%.3f", param.Bias))
 		guiOffsetY += offsetIncrement
+
+		//Draw Gain
+		rayGui.LabelEx(rl.NewRectangle(guiOffsetX, guiOffsetY, labelSizeX, 18), "Gain", rl.RayWhite, rl.Blank, rl.Blank)
+		rect = rl.NewRectangle(labelSizeX+guiOffsetX, guiOffsetY, 100, 18)
+		oldGain := param.Gain
+		param.Gain = float64(rayGui.SliderBar(rect, float32(param.Gain), 0.0, 1.0))
+		if param.Gain != oldGain {
+			changed = true
+		}
+		rayGui.Label(rect, fmt.Sprintf("%.3f", param.Gain))
+		guiOffsetY += offsetIncrement
+		guiOffsetX -= offsetIncrementX
+
 	}
 	guiOffsetX -= offsetIncrementX
 
-	// NoiseBias
-	rayGui.LabelEx(rl.NewRectangle(guiOffsetX, guiOffsetY, 100, 18), "Noise Layer Bias:", rl.RayWhite, rl.Gray, rl.Gray)
-	guiOffsetY += offsetIncrement
-	guiOffsetX += offsetIncrementX
-	for i := range buffer.NoiseBias {
-		labelSizeX := float32(65)
-		rayGui.LabelEx(rl.NewRectangle(guiOffsetX, guiOffsetY, labelSizeX, 18), goNoise.NOISETYPE_STRING[*buffer.NoiseTypes[i]], rl.RayWhite, rl.Gray, rl.Gray)
-
-		rect = rl.NewRectangle(guiOffsetX+labelSizeX, guiOffsetY, 100, 18)
-		oldWeight := *buffer.NoiseBias[i]
-		*buffer.NoiseBias[i] = float64(rayGui.SliderBar(rect, float32(oldWeight), 0.0, 1.0))
-		if *buffer.NoiseBias[i] != oldWeight {
-			changed = true
-		}
-
-		rayGui.Label(rect, fmt.Sprintf("%.3f", *buffer.NoiseBias[i]))
-		guiOffsetY += offsetIncrement
-	}
-	guiOffsetX -= offsetIncrementX
-
-	// NoiseGain
-	rayGui.LabelEx(rl.NewRectangle(guiOffsetX, guiOffsetY, 100, 18), "Noise Layer Gain:", rl.RayWhite, rl.Gray, rl.Gray)
-	guiOffsetY += offsetIncrement
-	guiOffsetX += offsetIncrementX
-	for i := range buffer.NoiseGain {
-		labelSizeX := float32(65)
-		rayGui.LabelEx(rl.NewRectangle(guiOffsetX, guiOffsetY, labelSizeX, 18), goNoise.NOISETYPE_STRING[*buffer.NoiseTypes[i]], rl.RayWhite, rl.Gray, rl.Gray)
-
-		rect = rl.NewRectangle(guiOffsetX+labelSizeX, guiOffsetY, 100, 18)
-		oldWeight := *buffer.NoiseGain[i]
-		*buffer.NoiseGain[i] = float64(rayGui.SliderBar(rect, float32(oldWeight), 0.0, 1.0))
-		if *buffer.NoiseGain[i] != oldWeight {
-			changed = true
-		}
-		rayGui.Label(rect, fmt.Sprintf("%.3f", *buffer.NoiseGain[i]))
-		guiOffsetY += offsetIncrement
-	}
 	guiOffsetX -= offsetIncrementX
 	buffer.Changed = changed
 
-	return buffer
+}
+func drawNoiseParams(params *goNoise.NoiseParams) bool {
+	changed := false
+	return changed
 }

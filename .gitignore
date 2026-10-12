@@ -1,0 +1,12 @@
+bin
+**/*.exe
+*.exe
+__debug_bin
+**/github.com
+
+**/*.png
+!screenshots
+**/*.jpg
+**/*.jpeg
+**/*.gif
+**/*.fon

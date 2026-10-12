@@ -21,10 +21,11 @@ func getIdx(x, y, width int) int {
 }
 
 // Helper Func for a single point
-func getFBM(noise snoise.Noise, x, y int, context NoiseParams, scale float64) float64 {
+func getFBM(pnoise *snoise.Noise, x, y int, context NoiseParams, scale float64) float64 {
 	amplitude := 1.0
 	frequency := 1.0
 	noiseHeight := 0.0
+	noise := *pnoise
 
 	// get new value
 	for i := 0; i < context.Octaves; i++ {
@@ -41,10 +42,11 @@ func getFBM(noise snoise.Noise, x, y int, context NoiseParams, scale float64) fl
 }
 
 // Helper Func for a single point
-func getFloat64FBM(noise snoise.Noise, x, y float64, context NoiseParams, scale float64) float64 {
+func getFloat64FBM(pnoise *snoise.Noise, x, y float64, context NoiseParams, scale float64) float64 {
 	amplitude := 1.0
 	frequency := 1.0
 	noiseHeight := 0.0
+	noise := *pnoise
 
 	// get new value
 	for i := 0; i < context.Octaves; i++ {

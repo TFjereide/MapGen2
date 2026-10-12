@@ -33,6 +33,7 @@ const (
 	FRESHWATER
 	OCEANIC_GLACIER
 	GLACIER
+	SNOW
 	MOUNTAIN
 	BARE
 	TUNDRA
@@ -55,6 +56,7 @@ var BIOME_NAMES = [...]string{
 	"freshwater",
 	"oceanic glacier",
 	"glacier",
+	"snow",
 	"mountain",
 	"bare",
 	"tundra",
@@ -76,6 +78,7 @@ var BIOME_BG_COLORS = [...]rl.Color{
 	rl.NewColor(8, 24, 73, 255),     //freshwater
 	rl.NewColor(233, 235, 255, 255), // oceanic Glacier
 	rl.NewColor(233, 235, 255, 255), // Glacier
+	rl.NewColor(233, 235, 255, 255), // SNOW
 	rl.NewColor(156, 155, 134, 255), // mountain
 	rl.NewColor(100, 100, 90, 255),  // bare
 	rl.NewColor(50, 82, 64, 255),    //Tundra
@@ -97,6 +100,7 @@ var BIOME_FG_COLORS = [...]rl.Color{
 	rl.NewColor(46, 62, 165, 255),   // freshwater
 	rl.NewColor(233, 235, 255, 255), // Oceanic Glacier
 	rl.NewColor(243, 235, 255, 255), // Glacier
+	rl.NewColor(243, 235, 255, 255), // SNOW
 	rl.NewColor(160, 160, 160, 255), // Mountain
 	rl.NewColor(60, 39, 20, 255),    // bare
 	rl.NewColor(60, 60, 34, 255),    //Tundra
@@ -118,6 +122,7 @@ var BIOME_SYMBOLS = [...]string{
 	`≈≈`,                // freshwater
 	`░░`,                // Oceanic Glacier
 	`░░`,                // Glacier
+	`░░`,                // SNOW
 	`▲▲^`,               // Mountain
 	`▲^^^^`,             // bare
 	`░░░▒▓""`,           // Tundra
@@ -134,6 +139,7 @@ var BIOME_SYMBOLS = [...]string{
 	`≈░░¾≈`} // wetland
 
 var RIVER_FG_COLOR = rl.NewColor(20, 140, 170, 150)
+var COAST_FG_COLOR = rl.NewColor(20, 110, 140, 255)
 
 // TODO: implement temp scaling to real world celsius
 const MAX_TEMP_C = 40

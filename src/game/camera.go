@@ -10,16 +10,7 @@ func MoveCamera(game *GameContainer, input InputContext, fontWidth, fontHeight, 
 	game.Camera.Target.X += float32(moveDirX) * 20.0
 	game.Camera.Target.Y += float32(moveDirY) * 20.0
 
-	//Clamp
-	if game.Camera.Target.X < 0 {
-		game.Camera.Target.X = 0
-	} else if int32(game.Camera.Target.X) > mapWidth*fontWidth-game.CameraSizeX {
-		game.Camera.Target.X = float32(mapWidth*fontWidth - game.CameraSizeX)
-	}
-	if game.Camera.Target.Y < 0 {
-		game.Camera.Target.Y = 0
-	} else if int32(game.Camera.Target.Y) > mapHeight*fontHeight-game.CameraSizeY {
-		game.Camera.Target.Y = float32(mapHeight*fontHeight - game.CameraSizeY)
-	}
+	game.Camera.Target.X = common.ClampF32(game.Camera.Target.X, 0, float32(mapWidth*fontWidth-game.CameraSizeX))
+	game.Camera.Target.Y = common.ClampF32(game.Camera.Target.Y, 0, float32(mapHeight*fontHeight-game.CameraSizeY))
 
 }

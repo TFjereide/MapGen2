@@ -21,48 +21,38 @@ type InputContext struct {
 	SetModeMoisture    bool
 	SetModeWatersheds  bool
 	SetModeFlow        bool
+	ModeChanged        bool
 }
 
 func NewInputContext() InputContext {
-	return InputContext{
-		MoveLeft:           false,
-		MoveRight:          false,
-		MoveUp:             false,
-		MoveDown:           false,
-		SetModeColor:       false,
-		SetModeHeight:      false,
-		SetModeTemperature: false,
-		SetModeMoisture:    false,
-		SetModeWatersheds:  false,
-		SetModeFlow:        false}
+	return InputContext{}
 }
 
-func GetInput(inputContext *InputContext) (bool, bool) {
+func GetInput(inputContext *InputContext) {
 
-	changed := false
-	regen := false
+	modeChanged := false
 	if rl.IsKeyPressed(rl.KeyOne) {
-		changed = true
+		modeChanged = true
 		inputContext.SetModeColor = true
 	}
 	if rl.IsKeyPressed(rl.KeyTwo) {
-		changed = true
+		modeChanged = true
 		inputContext.SetModeHeight = true
 	}
 	if rl.IsKeyPressed(rl.KeyThree) {
-		changed = true
+		modeChanged = true
 		inputContext.SetModeTemperature = true
 	}
 	if rl.IsKeyPressed(rl.KeyFour) {
-		changed = true
+		modeChanged = true
 		inputContext.SetModeMoisture = true
 	}
 	if rl.IsKeyPressed(rl.KeyFive) {
-		changed = true
+		modeChanged = true
 		inputContext.SetModeWatersheds = true
 	}
 	if rl.IsKeyPressed(rl.KeySix) {
-		changed = true
+		modeChanged = true
 		inputContext.SetModeFlow = true
 	}
 	if rl.IsKeyDown(rl.KeyW) {
@@ -77,21 +67,11 @@ func GetInput(inputContext *InputContext) (bool, bool) {
 	if rl.IsKeyDown(rl.KeyD) {
 		inputContext.MoveRight = true
 	}
-	if rl.IsKeyDown(rl.KeyP) {
-		changed = true
-		regen = true
-		inputContext.WorldSizeIncrease = true
-	}
-	if rl.IsKeyDown(rl.KeyO) {
-		changed = true
-		regen = true
-		inputContext.WorldSizeDecrease = true
-	}
 
 	inputContext.MouseX = rl.GetMouseX()
 	inputContext.MouseY = rl.GetMouseY()
 
-	return changed, regen
+	inputContext.ModeChanged = modeChanged
 }
 
 func SetConsoleMode(input InputContext) int {
@@ -167,10 +147,10 @@ func UpdateConsoleVisuals(game *GameContainer, mode int) {
 	}
 }
 
-func DrawMousePointer(game *GameContainer, inputContext InputContext, fontWidth, fontHeight, mapWidth, mapHeight int32) {
+func DrawMousePointer(game *GameContainer, fontWidth, fontHeight, mapWidth, mapHeight int32) {
 	//Get info for mouse pointer
-	worldMousePosX := ((-8 + inputContext.MouseX + int32(game.Camera.Target.X)) / fontWidth)
-	worldMousePosY := ((-8 + inputContext.MouseY + int32(game.Camera.Target.Y)) / fontHeight)
+	worldMousePosX := ((-8 + game.InputActions.MouseX + int32(game.Camera.Target.X)) / fontWidth)
+	worldMousePosY := ((-8 + game.InputActions.MouseY + int32(game.Camera.Target.Y)) / fontHeight)
 	if worldMousePosX < 0 || worldMousePosX > game.CameraSizeX {
 		worldMousePosX = 0
 	}

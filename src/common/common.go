@@ -15,7 +15,7 @@ func ConvertArrayFloat64ToByte(f []float64) []byte {
 func ConvertArrayByteToFloat64(b []byte) []float64 {
 	floatmap := make([]float64, len(b))
 	for i := 0; i < len(b); i++ {
-		floatmap[i] = float64(b[i] / 255)
+		floatmap[i] = float64(b[i]) / 255
 	}
 	return floatmap
 }

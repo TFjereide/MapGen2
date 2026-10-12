@@ -23,7 +23,7 @@ func GenFBMChunks(width int, height int, context NoiseParams, scale float64) *[]
 		chanBuffer.Add(1)
 		go getFBMchunk(
 			&chanBuffer, chunks,
-			noise,
+			&noise,
 			chnk*chunksize, width, chunksize,
 			context, scale)
 	}
@@ -75,7 +75,7 @@ func GenFBMParalell(width int, height int, context NoiseParams, scale float64) *
 		chanBuffer.Add(1)
 		go getFBMRow(
 			&chanBuffer, rows,
-			noise,
+			&noise,
 			y, width,
 			context, scale)
 	}
@@ -124,7 +124,7 @@ func GenRidgedFBMParalell(width int, height int, context NoiseParams, scale floa
 		chanBuffer.Add(1)
 		go getFBMRow(
 			&chanBuffer, rows,
-			noise,
+			&noise,
 			y, width, context, scale)
 	}
 
@@ -185,7 +185,7 @@ func GenPerturbedFBMParalell(width int, height int, context NoiseParams, scale f
 		chanBuffer.Add(1)
 		go getFBMRowPerturbed(
 			&chanBuffer, rows,
-			noise,
+			&noise,
 			y, width,
 			context, perturbContext, scale, perturbAmount)
 	}
@@ -223,18 +223,20 @@ func GenPerturbedFBMParalell(width int, height int, context NoiseParams, scale f
 }
 
 // Small jobs helper functions
-func getFBMRow(buffer *sync.WaitGroup, c chan []float64, noise snoise.Noise, y, width int, context NoiseParams, scale float64) {
+func getFBMRow(buffer *sync.WaitGroup, c chan []float64, pnoise *snoise.Noise, y, width int, context NoiseParams, scale float64) {
 	defer buffer.Done()
+	noise := *pnoise
 
 	row := make([]float64, width+1)
 	row[0] = float64(y)
 	for x := 1; x < width+1; x++ {
-		row[x] = getFBM(noise, x, y, context, scale)
+		row[x] = getFBM(&noise, x, y, context, scale)
 	}
 	c <- row
 }
-func getFBMchunk(buffer *sync.WaitGroup, c chan []float64, noise snoise.Noise, rowOffset, width, chunkSize int, context NoiseParams, scale float64) {
+func getFBMchunk(buffer *sync.WaitGroup, c chan []float64, pnoise *snoise.Noise, rowOffset, width, chunkSize int, context NoiseParams, scale float64) {
 	defer buffer.Done()
+	noise := *pnoise
 
 	chunk := make([]float64, chunkSize+1)
 	chunk[0] = float64(rowOffset)
@@ -244,21 +246,39 @@ func getFBMchunk(buffer *sync.WaitGroup, c chan []float64, noise snoise.Noise, r
 		x := (i - 1) % width
 		y := rowOffset + ((i - 1) / width)
 
-		chunk[i] = getFBM(noise, x, y, context, scale)
+		chunk[i] = getFBM(&noise, x, y, context, scale)
 	}
 	c <- chunk
 }
 
-func getFBMRowPerturbed(buffer *sync.WaitGroup, c chan []float64, noise snoise.Noise,
+func getFBMRowPerturbed(buffer *sync.WaitGroup, c chan []float64, pnoise *snoise.Noise,
 	y, width int, context, perturbContext NoiseParams, scale, perturbAmount float64) {
 
 	defer buffer.Done()
+	noise := *pnoise
 
 	row := make([]float64, width+1)
 	row[0] = float64(y)
 	for x := 1; x < width+1; x++ {
-		offset := getFBM(noise, x-1, y, perturbContext, scale*0.5)
-		row[x] = getFloat64FBM(noise, offset, offset, context, scale)
+		//offsetx := getFBM(&noise, x-1, y, perturbContext, scale*perturbAmount)
+		///offsety := getFBM(&noise, x-1, y, perturbContext, scale*perturbAmount)
+
+		//row[x] = getFloat64FBM(&noise, float64(x)+offsetx, float64(y)+offsety, context, scale)
+		perturbation := getFloat64FBM(&noise, float64(x), float64(y), context, scale)
+		amplitude := 1.0
+		frequency := 1.0
+		noiseHeight := 0.0
+		// get new value
+		for i := 0; i < context.Octaves; i++ {
+			sampleX := float64(x) / (context.ScaleX * scale) * (frequency * perturbation)
+			sampleY := float64(y) / (context.ScaleY * scale) * (frequency * perturbation)
+
+			nValue := noise.Eval2(sampleX, sampleY)
+			noiseHeight += nValue * amplitude
+			amplitude *= context.Persistance
+			frequency *= context.Lacunarity
+		}
+		row[x] = noiseHeight
 	}
 	c <- row
 }

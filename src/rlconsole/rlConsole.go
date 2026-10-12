@@ -68,6 +68,7 @@ func NewConsoleLayer(width, height int, font SpriteSheetFont) *ConsoleLayer {
 	for i, _ := range clayer.RandColors {
 		clayer.RandColors[i] = rl.NewColor(uint8(rand.Float32()*255.0), uint8(rand.Float32()*255.0), uint8(rand.Float32()*255.0), 255)
 	}
+	clayer.RandColors[0] = rl.Black
 
 	return &clayer
 }
@@ -227,10 +228,11 @@ func (clayer *ConsoleLayer) ExtractVisuals(world *worldgen.World) {
 			waterRatioCorrected := (fHeight - waterHeight) * (1.0 / waterHeight)
 
 			shadowFactor := waterRatioCorrected
-			waterRatioCorrected *= 0.55
+			waterRatioCorrected *= 0.5
 
-			brightness := (1.0 - lightMap[i]) * float32(shadowFactor*0.6)
+			brightness := (1.0 - lightMap[i]) * float32(shadowFactor*0.5)
 			brightness = 1.0 - brightness
+			brightness *= brightness
 
 			//brightness := 1.0 - waterRatioCorrected // brighter further down
 			//brightness := (fHeight * 0.5) + 0.5 // brighter further up
@@ -337,6 +339,7 @@ func (clayer *ConsoleLayer) ExtractVisuals(world *worldgen.World) {
 			}
 
 			symMap[i] = IBM_437_ASCII_MAP[BitMaskThick[bitMask]]
+			fgColormap[i] = worldgen.COAST_FG_COLOR
 			//symMap[i] = IBM_437_ASCII_MAP["#"]
 		}
 	}

@@ -3,6 +3,7 @@ package worldgenerator
 import (
 	"common"
 	rl "github.com/gen2brain/raylib-go/raylib"
+	goNoise "goNoise"
 )
 
 // Define terraintypes in the form of biomes
@@ -52,6 +53,11 @@ type WorldParams struct {
 	FWaterHeight  float64
 	MountainLine  byte
 	FMountainLine float64
+
+	ContinentMaskParams goNoise.NoiseParams
+	MountainMaskParams  goNoise.NoiseParams
+	MountainNoiseParams []goNoise.NoiseParams
+	LandNoiseParams     []goNoise.NoiseParams
 }
 
 func (world *World) GetBiomeAtPoint(x, y int) string {

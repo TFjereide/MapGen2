@@ -4,7 +4,7 @@ import (
 	common "common"
 	"fmt"
 	rl "github.com/gen2brain/raylib-go/raylib"
-	"github/raylib-go-master/easings"
+	easings "github/raylib-go-master/easings"
 
 	goNoise "goNoise"
 	"math"
@@ -12,10 +12,13 @@ import (
 )
 
 // Generates a proper world struct in several stages
-func GenerateWorld(
-	params WorldParams,
-	continentMaskParams, mountainMaskParams goNoise.NoiseParams,
-	mountainNoiseParams, landNoiseParams []goNoise.NoiseParams) *World {
+func GenerateWorld(params WorldParams) *World {
+	timing := time.Now().UnixNano() / 1000000
+
+	continentMaskParams := params.ContinentMaskParams
+	mountainMaskParams := params.MountainMaskParams
+	mountainNoiseParams := params.MountainNoiseParams
+	landNoiseParams := params.LandNoiseParams
 
 	// Set seeds for all parameters. It needs to be derived from one master seed and then offset
 	continentMaskParams.Seed = params.Seed + 20
@@ -48,10 +51,9 @@ func GenerateWorld(
 
 	// Noise map generation
 	start := time.Now().UnixNano() / 1000000
-
-	mountainMask := *goNoise.GenFBMParalell(width, height, mountainMaskParams, scale)
 	continentMask := *goNoise.GenFBMParalell(width, height, continentMaskParams, scale)
-
+	//continentMask := common.ConvertArrayByteToFloat64(goNoise.GenVoronoiCells(width, height, 50))
+	mountainMask := *goNoise.GenFBMParalell(width, height, mountainMaskParams, scale)
 	heightMap := *goNoise.GetLayeredNoise(width, height, landNoiseParams, scale)
 	mountainNoise := *goNoise.GetLayeredNoise(width, height, mountainNoiseParams, scale)
 	tempMap := *goNoise.GenFBMParalell(width, height, landNoiseParams[1], scale)
@@ -78,7 +80,10 @@ func GenerateWorld(
 		// Obtain mask of "Strength" based on distance from edges
 		centreDistanceFactor := (1.0 - math.Pow(latdistToCentre, 9)) * (1.0 - math.Pow(longdistToCentre, 9))
 		centreDistanceFactor = goNoise.GetGain(clampF64(centreDistanceFactor, 0.0, 1.0), 0.4)
-		heightMap[i] = heightMap[i] * centreDistanceFactor * continentMask[i]
+
+		heightMap[i] = ((heightMap[i] * 0.3) + (continentMask[i] * 0.7)) * centreDistanceFactor
+		//heightMap[i] = heightMap[i] * centreDistanceFactor * continentMask[i]
+
 		if heightMap[i] > fWaterHeight {
 			heightMap[i] -= fWaterHeight
 			heightMap[i] *= 0.33
@@ -105,12 +110,13 @@ func GenerateWorld(
 		distToWater := easeOutQuad(float64(world.DistanceToWater[i]) / float64(maxDistR+2))
 		heightMap[i] += (mountainNoise[i] * mountainMask[i] * distToWater) * (1.0 - highest_num)
 	}
-	heightMap = *fillDimples(&world, params, &heightMap)
+
+	//heightMap = *fillDimples(&world, params, &heightMap)
 	generateNormals(&world, params, &heightMap)
 
 	//Temperature
 	for i := 0; i < len(tempMap); i++ {
-		heatCentre := height - (height / 5 * 2)
+		heatCentre := height - (height / 6 * 2)
 		distToCentre := math.Pow(math.Abs(float64(heatCentre-(i/width)))/float64(heatCentre), 2.0)
 		//distToCentre := math.Pow(math.Abs(float64(midheight-(i/width)))/float64(midheight), 1.1)
 
@@ -121,7 +127,7 @@ func GenerateWorld(
 		height := heightMap[i]
 
 		if height < fWaterHeight {
-			tempMap[i] = ((goNoise.GetBias((centreDistanceFactor+height)*0.5, 0.97) * 0.7) + moistMap[i]*0.3)
+			tempMap[i] = ((goNoise.GetBias((centreDistanceFactor+height)*0.5, 0.90) * 0.8) + moistMap[i]*0.2)
 			continue
 		}
 
@@ -170,7 +176,7 @@ func GenerateWorld(
 				1.0)), 0.0, 1.0)
 			waterdist := easeOutQuad(1.0 - float64(world.DistanceToWater[i])/float64(maxDistR))
 
-			distToWaterFactor := 0.6
+			distToWaterFactor := 1.0
 			noisefactor := 3.0
 			tempFactor := 0.5
 			heightFactor := 0.3
@@ -180,10 +186,6 @@ func GenerateWorld(
 	}
 
 	generateWatersheds(&world, params, &heightMap, &moistMap)
-	//world.FlowStrength = make([]float64, width*height)
-	//world.FlowsFrom = make([][]int, width*height)
-	//world.FlowsTo = make([]int, width*height)
-
 	start = time.Now().UnixNano() / 1000000
 
 	world.HeightMap = common.ConvertArrayFloat64ToByte(heightMap)
@@ -208,6 +210,9 @@ func GenerateWorld(
 	t = time.Now().UnixNano() / 1000000
 	fmt.Println("biome map msec: ", t-start)
 
+	endtiming := time.Now().UnixNano() / 1000000
+	fmt.Println("-> World Map creation msec: ", endtiming-timing)
+
 	return &world
 
 }
@@ -223,7 +228,7 @@ func determineBiome(precipitation, cTemp float64, height, waterLine, mountainLin
 		} else {
 			biome = SHALLOW_SEA
 		}
-	} else if height > (255 - 20) {
+	} else if height > (mountainLine + 30) {
 		if precipitation > 100.0 && cTemp < 1.0 {
 			biome = GLACIER
 		} else {
@@ -232,6 +237,8 @@ func determineBiome(precipitation, cTemp float64, height, waterLine, mountainLin
 	} else if height > mountainLine {
 		if precipitation > 100.0 && cTemp < 1.0 {
 			biome = GLACIER
+		} else if precipitation > 50.0 && cTemp < 1.0 {
+			biome = TUNDRA
 		} else {
 			biome = BARE
 		}
@@ -241,15 +248,15 @@ func determineBiome(precipitation, cTemp float64, height, waterLine, mountainLin
 			// glacial zone
 			if precipitation < 10.0 {
 				biome = TEMPERATE_DESERT
-			} else if precipitation > 150.0 && height > mountainLine-20 {
+			} else if precipitation > 200.0 {
 				biome = GLACIER
 			} else {
 				biome = TUNDRA
 			}
 		} else if cTemp < 5.0 {
 			// boreal zone
-			if precipitation < 30.0 {
-				biome = SHRUBLAND
+			if precipitation < 40.0 {
+				biome = TUNDRA
 			} else {
 				biome = TAIGA
 			}
@@ -264,13 +271,13 @@ func determineBiome(precipitation, cTemp float64, height, waterLine, mountainLin
 			} else {
 				biome = TEMPERATE_RAINFOREST
 			}
-		} else if cTemp < 25.0 {
+		} else if cTemp < 28.0 {
 			// temperate zone
-			if precipitation < 25.0 {
+			if precipitation < 20.0 {
 				biome = TEMPERATE_DESERT
-			} else if precipitation < 45.0 {
+			} else if precipitation < 35.0 {
 				biome = SAVANNA
-			} else if precipitation < 70.0 {
+			} else if precipitation < 50.0 {
 				biome = GRASSLAND
 			} else if precipitation < 120.0 {
 				biome = SHRUBLAND
@@ -283,7 +290,7 @@ func determineBiome(precipitation, cTemp float64, height, waterLine, mountainLin
 			}
 		} else {
 			// tropical zone
-			if precipitation < 80.0 {
+			if precipitation < 50.0 {
 				biome = SUBTROPICAL_DESERT
 			} else if precipitation < 150.0 {
 				biome = SAVANNA

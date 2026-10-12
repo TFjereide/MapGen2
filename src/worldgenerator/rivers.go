@@ -20,6 +20,9 @@ func generateWatersheds(world *World, parameters WorldParams, pheightMap, pMoist
 			shoreline = append(shoreline, i)
 		}
 	}
+	if len(shoreline) == 0 {
+		panic("NO LAND")
+	}
 
 	//rand.Shuffle(len(shoreline), func(i, j int) {
 	//	shoreline[i], shoreline[j] = shoreline[j], shoreline[i]

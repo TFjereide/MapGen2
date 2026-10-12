@@ -21,7 +21,7 @@ func GenFBMJob(c chan *[]float64, width int, height int, context NoiseParams, sc
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
 
-			noiseHeight := getFBM(noise, x, y, context, scale)
+			noiseHeight := getFBM(&noise, x, y, context, scale)
 			if noiseHeight > maxNoiseHeight {
 				maxNoiseHeight = noiseHeight
 			} else if noiseHeight < minNoiseHeight {
@@ -118,7 +118,7 @@ func GenPerturbedFBMJob(c chan *[]float64, width int, height int, context NoiseP
 			frequency := 1.0
 			noiseHeight := 0.0
 
-			perturbation := getFBM(noise, x, y, perturbContext, scale) * perturbAmount
+			perturbation := getFBM(&noise, x, y, perturbContext, scale) * perturbAmount
 
 			// get new value
 			for i := 0; i < context.Octaves; i++ {
